@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <style>
+        .hidden {
+            display: none;
+        }
+    </style>
+    <script>
+
+        let currentCardIndex = 0;
+        let showAnswer = false;
+        let flashcards = [];
+
+        function loadDeck() {
+            const selectedDeckId = document.getElementById('selected_deck').value;
+            // Fetch flashcards for the selected deck (this is a placeholder, replace with actual fetch logic)
+            flashcards = [
+                { question: 'Question 1', answer: 'Answer 1' },
+                { question: 'Question 2', answer: 'Answer 2' },
+                { question: 'Question 3', answer: 'Answer 3' }
+            ];
+            currentCardIndex = 0;
+            showAnswer = false;
+            displayCard();
+        }
+
+        function displayCard() {
+            if (flashcards.length === 0) {
+                document.getElementById('flashcard-content').innerText = 'No flashcards available.';
+                return;
+            }
+
+            if (currentCardIndex >= flashcards.length) {
+                document.getElementById('flashcard-content').innerText = 'Complete';
+                document.getElementById('prevBtn').style.display = 'none';
+                return;
+            }
+
+            const card = flashcards[currentCardIndex];
+            document.getElementById('flashcard-content').innerText = showAnswer ? card.answer : card.question;
+            document.getElementById('toggleAnswerBtn').innerText = showAnswer ? 'Show Question' : 'Show Answer';
+        }
+
+        function toggleAnswer() {
+            showAnswer = !showAnswer;
+            displayCard();
+        }
+
+        function nextCard() {
+            if (currentCardIndex < flashcards.length - 1) {
+                currentCardIndex++;
+                showAnswer = false;
+                displayCard();
+            }
+        }
+
+        function prevCard() {
+            if (currentCardIndex > 0) {
+                currentCardIndex--;
+                showAnswer = false;
+                displayCard();
+            }
+        }
+        
+        function showTestground() {
+            document.getElementById('dashboard-view').classList.add('hidden');
+            document.getElementById('testground-view').classList.remove('hidden');
+        }
+
+        function showDashboard() {
+            document.getElementById('testground-view').classList.add('hidden');
+            document.getElementById('dashboard-view').classList.remove('hidden');
+        }
+
+        function showLearn() {
+            document.getElementById('learn-view').classList.remove('hidden');
+            document.getElementById('review-view').classList.add('hidden');
+            document.getElementById('test-view').classList.add('hidden');
+            document.getElementById('matching-view').classList.add('hidden');
+        }
+
+        function showReview() {
+            document.getElementById('review-view').classList.remove('hidden');
+            document.getElementById('learn-view').classList.add('hidden');
+            document.getElementById('test-view').classList.add('hidden');
+            document.getElementById('matching-view').classList.add('hidden');
+        }
+
+        function showTest() {
+            document.getElementById('learn-view').classList.add('hidden');
+            document.getElementById('review-view').classList.add('hidden');
+            document.getElementById('test-view').classList.remove('hidden');
+            document.getElementById('matching-view').classList.add('hidden');
+        }
+
+        function showMatching() {
+            document.getElementById('learn-view').classList.add('hidden');
+            document.getElementById('review-view').classList.add('hidden');
+            document.getElementById('test-view').classList.add('hidden');
+            document.getElementById('matching-view').classList.remove('hidden');
+        }
+    </script>
+</head>
+<body>
+    <div id="dashboard-view">
+        <h1>Dashboard</h1>
+        <form action="{% url 'create_deck' %}" method="post">
+            {% csrf_token %}
+            <label for="deck_name">Deck Name:</label>
+            <input type="text" id="deck_name" name="deck_name" required>
+            <label for="deck_description">Deck Description:</label>
+            <textarea id="deck_description" name="deck_description" required></textarea>
+            <button type="submit">Create Deck</button>
+        </form>
+
+        <form action="{% url 'dashboard' %}" method="post">
+            {% csrf_token %}
+            <label for="selected_deck">Select Deck:</label>
+            <select id="selected_deck" name="selected_deck" required onchange="this.form.submit()">
+                <option value="">Select a deck</option>
+                {% for deck in decks %}
+                    <option value="{{ deck.id }}" {% if selected_deck and deck.id == selected_deck.id %}selected{% endif %}>{{ deck.name }}</option>
+                {% endfor %}
+            </select>
+        </form>
+
+        {% if selected_deck %}
+            <h2>Edit Deck: {{ selected_deck.name }}</h2>
+            <form action="{% url 'dashboard' %}" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="selected_deck" value="{{ selected_deck.id }}">
+                <label for="deck_name">Deck Name:</label>
+                <input type="text" id="deck_name" name="deck_name" value="{{ selected_deck.name }}" required>
+                <label for="deck_description">Deck Description:</label>
+                <textarea id="deck_description" name="deck_description" required>{{ selected_deck.description }}</textarea>
+
+                <h2>Edit Flashcards</h2>
+                {% for flashcard in flashcards %}
+                    <div>
+                        <label for="question_{{ flashcard.id }}">Question:</label>
+                        <textarea id="question_{{ flashcard.id }}" name="question_{{ flashcard.id }}" required>{{ flashcard.question }}</textarea>
+                        <label for="answer_{{ flashcard.id }}">Answer:</label>
+                        <textarea id="answer_{{ flashcard.id }}" name="answer_{{ flashcard.id }}" required>{{ flashcard.answer }}</textarea>
+                    </div>
+                {% endfor %}
+
+                <button type="submit">Save Changes</button>
+            </form>
+
+            <h2>Add Flashcard to {{ selected_deck.name }}</h2>
+            <form action="{% url 'dashboard' %}" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="selected_deck" value="{{ selected_deck.id }}">
+                <label for="question">Question:</label>
+                <textarea id="question" name="question" required></textarea>
+                <label for="answer">Answer:</label>
+                <textarea id="answer" name="answer" required></textarea>
+                <button type="submit">Add Flashcard</button>
+            </form>
+        {% endif %}
+
+        <button onclick="showTestground()">Go to Testground</button>
+    </div>
+
+    <div id="testground-view" class="hidden">
+        <h1>Testground</h1>
+        <button onclick="showLearn()">Learn</button>
+        <button onclick="showReview()">Review</button>
+        <button onclick="showTest()">Test</button>
+        <button onclick="showMatching()">Matching</button>
+        <button onclick="showDashboard()">Back to Dashboard</button>
+
+        <div id="learn-view" class="hidden">
+            <h2>Learn Mode</h2>
+            <form>
+                <label for="selected_deck">Select Deck:</label>
+                <select id="selected_deck" name="selected_deck" onchange="loadDeck()">
+                    <option value="">Select a deck</option>
+                    <option value="1">Deck 1</option>
+                    <option value="2">Deck 2</option>
+                    <option value="3">Deck 3</option>
+                </select>
+            </form>
+        
+            <div id="flashcard-view">
+                <h2>Flashcards</h2>
+                <div id="flashcard-content">Please select a deck to start.</div>
+                <button id="toggleAnswerBtn" onclick="toggleAnswer()">Show Answer</button>
+                <button id="prevBtn" onclick="prevCard()">Previous</button>
+                <button id="nextBtn" onclick="nextCard()">Next</button>
+            </div>
+        </div>
+
+        <div id="review-view" class="hidden">
+            <h2>Review Mode</h2>
+            <!-- Add your learn mode content here -->
+        </div>
+
+        <div id="test-view" class="hidden">
+            <h2>Test Mode</h2>
+            <!-- Add your test mode content here -->
+            </div>
+            
+            <script>
+            function showAnswer() {
+                document.getElementById('answerSection').style.display = 'block';
+                document.getElementById('showAnswerBtn').style.display = 'none';
+            }
+            </script>
+        </div>
+
+        <div id="matching-view" class="hidden">
+            <h2>Matching Mode</h2>
+            <!-- Add your matching mode content here -->
+        </div>
+    </div>
+</body>
+</html>
