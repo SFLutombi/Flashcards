@@ -16,12 +16,13 @@ class Flashcard(models.Model):
     answer = models.TextField()
     deck = models.ForeignKey('Deck', on_delete=models.CASCADE)
     
-    # Spaced repetition fields
-    ease_factor = models.FloatField(default=2.5)
-    interval = models.IntegerField(default=0)
-    due_date = models.DateTimeField(default=timezone.now)
-    repetitions = models.IntegerField(default=0)
-    last_review = models.DateTimeField(null=True, blank=True)
+    # Quality
+    quality_score = models.FloatField(default=0)
+    response_time = models.FloatField(default=0)
+    streak = models.IntegerField(default=0)
+    review_required = models.BooleanField(default=False)
+    difficulty_rating = models.IntegerField(default=0)  # Will store 1-5 rating
+    
 
 
 
