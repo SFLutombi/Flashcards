@@ -1,3 +1,4 @@
+// 1. Class definitions
 class Flashcard {
     constructor(question, answer) {
         this.question = question;
@@ -5,67 +6,179 @@ class Flashcard {
     }
 }
 
+// 2. Global state variables
 let flashcards = [];
 let currentCardIndex = 0;
 let showAnswer = false;
-let currentMode = ''; // Store the current mode
+let currentMode = '';
 
-function displayCard() {
-    // Construct the ID based on the mode
-    const flashcardContentId = `${currentMode}-flashcard-content`; // e.g., "learn-flashcard-content"
-    const flashcardAnswerId = `${currentMode}-flashcard-answer`; // e.g., "learn-flashcard-answer"
-    const flashcardContent = document.getElementById(flashcardContentId); // Select by ID
-    const flashcardAnswer = document.getElementById(flashcardAnswerId); // Select by ID
-
-    // Check if the flashcardContent element is found
-    if (!flashcardContent) {
-        console.error(`No element found for mode: ${currentMode}`); // Error handling for debugging
-        return;
+// 3. Core data manipulation functions
+function generateTrueFalseCards(originalFlashcards) {
+    if (!Array.isArray(originalFlashcards) || originalFlashcards.length === 0) {
+        console.error('Invalid flashcards array provided to generateTrueFalseCards');
+        return [];
     }
 
-    if (flashcards.length === 0) {
-        flashcardContent.innerText = 'No flashcards available.';
-        return;
-    }
-
-    const currentCard = flashcards[currentCardIndex];
-    flashcardContent.innerText = currentCard.question; // Display the current question
-
-    if (currentMode === 'learn' || currentMode === 'truefalse') {
-        flashcardAnswer.innerText = currentCard.answer; // Display the answer
-    }
-}
-
-function generateTrueFalseCards(deck, flashcards) {
-    // Create a new array to hold the true/false cards
     const trueFalseCards = [];
 
-    // Loop through each flashcard in the deck
-    flashcards.forEach(card => {
-        // Create a question object
+    originalFlashcards.forEach(card => {
         const questionObj = {
             question: card.question,
-            answer: card.answer // Store the correct answer initially
+            answer: card.answer,
+            correctAnswer: 'True',
+            displayedAnswer: card.answer,
+            Answer: 'True'
         };
+ 
+        const wrongAnswers = originalFlashcards
+            .filter(c => c.answer !== card.answer)
+            .map(c => c.answer);
 
-        // Get all answers excluding the current card's answer to ensure it's not the same
-        const wrongAnswers = flashcards
-            .filter(c => c.answer !== card.answer) // Filter out the correct answer
-            .map(c => c.answer); // Get answers from other cards
+        if (wrongAnswers.length > 0) {
+            const showCorrect = Math.random() < 0.5;
+            
+            if (!showCorrect) {
+                const falseAnswer = wrongAnswers[Math.floor(Math.random() * wrongAnswers.length)];
+                questionObj.displayedAnswer = falseAnswer;
+                questionObj.correctAnswer = 'False';
+            }
+        }
 
-        // Randomly select a false answer from the available options
-        const falseAnswer = wrongAnswers[Math.floor(Math.random() * wrongAnswers.length)];
-
-        // Randomly choose between the correct answer and the false answer
-        questionObj.answer = Math.random() < 0.5 ? questionObj.answer : falseAnswer;
-
-        // Add the question object to the trueFalseCards array
         trueFalseCards.push(questionObj);
     });
 
     return trueFalseCards;
 }
 
+function checkAnswer(card, userAnswer) {
+    if (!card || typeof card.correctAnswer === 'undefined') {
+        console.error('Invalid card object:', card);
+        return false;
+    }
+    console.log('this is the  user answer:', userAnswer);
+    const isDisplayedCorrect = (card.Answer === card.correctAnswer);
+    console.log('this is the correct answer:', card.correctAnswer);
+    console.log('this is the displayed answer:', card.displayedAnswer);
+    return (userAnswer === 'true' && isDisplayedCorrect) || 
+           (userAnswer === 'false' && !isDisplayedCorrect);
+}
+
+function deleteFlashcard(event, formElement) {
+    event.preventDefault();  // Prevent form submission
+
+    const flashcardDiv = formElement.closest('.flashcard');  // Get the parent flashcard div
+    const flashcardId = flashcardDiv.dataset.flashcardId;  // Extract flashcard ID from data attribute
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    fetch(`/delete-flashcard/${flashcardId}/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken,
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            flashcardDiv.remove();  // Remove the flashcard div from the DOM
+        } else {
+            alert('Error deleting flashcard');
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+function deleteDeck(event, buttonElement) {
+    event.preventDefault();  // Prevent default form submission
+
+    const deckDiv = buttonElement.closest('.deck-card');  // Get the deck div
+    const deckId = deckDiv.dataset.deckId;  // Extract the deck ID
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    fetch(`/delete_deck/${deckId}/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken,
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Deck deleted successfully!');
+            deckDiv.remove();  // Remove the deck div from the DOM
+
+            // Remove the deck from the select dropdown
+            const optionToRemove = document.querySelector(`#selected_deck option[value="${deckId}"]`);
+            if (optionToRemove) {
+                optionToRemove.remove();
+            }
+
+            // Clear the edit deck form and flashcards if the deleted deck was selected
+            const selectedDeckInput = document.querySelector('input[name="selected_deck"]');
+            if (selectedDeckInput && selectedDeckInput.value == deckId) {
+                clearEditDeckForm();  // Call function to clear the form
+                hideFlashcardSections();  // Call function to hide the flashcard sections
+            }
+        } else {
+            alert('Error deleting deck');
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+function saveFlashcard(event, flashcardId) {
+    event.preventDefault(); // Prevent form from submitting normally
+
+    const form = document.getElementById(`edit-flashcard-form-${flashcardId}`);
+    const formData = new FormData(form);
+
+    fetch(`/edit_flashcard/${flashcardId}/`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            // Remove CSRF token header for testing
+        },
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.json();
+        } else {
+            throw new Error('Failed to save changes.');
+        }
+    })
+    .then(data => {
+        // Update the flashcard display with new values
+        document.getElementById(`question_${flashcardId}`).value = data.question;
+        document.getElementById(`answer_${flashcardId}`).value = data.answer;
+        alert("Flashcard updated successfully!");
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert("Error saving flashcard.");
+    });
+}
+
+// Function to clear the edit deck form
+function clearEditDeckForm() {
+    const deckNameInput = document.querySelector('input[name="edit_deck_name"]');
+    const deckDescriptionTextarea = document.querySelector('textarea[name="edit_deck_description"]');
+    const editDeckForm = document.getElementById('edit-deck-form');
+    if (deckNameInput) deckNameInput.value = '';  // Clear the deck name input
+    if (deckDescriptionTextarea) deckDescriptionTextarea.value = '';  // Clear the deck description textarea
+    if (editDeckForm) editDeckForm.style.display = 'none';  // Clear the deck ID from the form data attribute
+}
+
+// Function to hide the flashcard sections
+function hideFlashcardSections() {
+    const flashcardsContainer = document.getElementById('flashcards-container');
+    const addFlashcardForm = document.getElementById('add-flashcard-form');
+    
+    if (flashcardsContainer) flashcardsContainer.style.display = 'none';  // Hide flashcards
+    if (addFlashcardForm) addFlashcardForm.style.display = 'none';  // Hide add flashcard form
+}
+
+// 4. API interaction functions
 function fetchFlashcards(deckId, shuffle = false) {
     const url = `/api/flashcards/${deckId}${shuffle ? '?shuffle=true' : ''}`;
 
@@ -77,16 +190,16 @@ function fetchFlashcards(deckId, shuffle = false) {
             return response.json();
         })
         .then(data => {
-            // Create flashcards from the fetched data
-            flashcards = data.map(item => new Flashcard(item.question, item.answer));
+            const originalFlashcards = data.map(item => new Flashcard(item.question, item.answer));
 
-            // If the current mode is true/false, generate true/false cards
             if (currentMode === 'truefalse') {
-                flashcards = generateTrueFalseCards(deckId, flashcards);
+                flashcards = generateTrueFalseCards(originalFlashcards);
+            } else {
+                flashcards = originalFlashcards;
             }
 
             currentCardIndex = 0;
-            displayCard(currentMode); // Call displayCard with the current mode
+            displayCard();
         })
         .catch(error => {
             console.error('Error fetching flashcards:', error);
@@ -94,105 +207,17 @@ function fetchFlashcards(deckId, shuffle = false) {
         });
 }
 
-// Event delegation handler for the entire mode-container
-function setupModeEventListeners() {
-    const modeContainer = document.getElementById('mode-container');
-    
-    if (!modeContainer) return;
-
-    modeContainer.addEventListener('click', (event) => {
-        const target = event.target;
-
-        // Handle button clicks using data attributes
-        if (target.matches('[data-action]')) {
-            const action = target.dataset.action;
-            
-            switch (action) {
-                case 'toggle-answer-learn':
-                    toggleAnswer('learn');;
-                    break;
-                case 'toggle-answer-test':
-                    toggleAnswer('test');
-                    break;
-                case 'next-card':
-                    currentCardIndex = (currentCardIndex + 1) % flashcards.length;
-                    displayCard();
-                    break;
-                case 'prev-card':
-                    currentCardIndex = (currentCardIndex - 1 + flashcards.length) % flashcards.length;
-                    displayCard();
-                    break;
-                case 'true':
-                    // Handle true button click
-                    break;
-                case 'false':
-                    // Handle false button click
-                    break;
-                
-                // Add more actions as needed
-            }
-        }
-    });
-
-    // Handle select changes using event delegation
-    modeContainer.addEventListener('change', (event) => {
-        const target = event.target;
-
-        if (target.matches('[data-deck-select]')) {
-            const mode = target.dataset.deckSelect;
-            const deckId = target.value;
-
-            if (!deckId) {
-                alert('Please select a valid deck.');
-                return;
-            }
-
-            // Shuffle cards only in test mode
-            fetchFlashcards(deckId, mode === 'truefalse' || mode === 'matching');
-        }
-    });
-}
-
-// Load mode content and initialize components
-function loadMode(mode) {
-    currentMode = mode; // Store the current mode
-
-    fetch(`/mode/${mode}/`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`Failed to load ${mode} mode`);
-            }
-            return response.text();
-        })
-        .then(html => {
-            const modeContainer = document.getElementById('mode-container');
-            modeContainer.innerHTML = html;
-            
-            // Load decks if the mode has deck selects
-            if (modeContainer.querySelector('[data-deck-select]')) {
-                loadDecks();
-            }
-        })
-        .catch(error => {
-            console.error('Error loading the mode:', error);
-        });
-}
-
-// Modified loadDecks function to use data attributes
 function loadDecks() {
     fetch('/api/decks/')
         .then(response => response.json())
         .then(decks => {
-            // Find all deck select elements using data attribute
             const deckSelects = document.querySelectorAll('[data-deck-select]');
             
             deckSelects.forEach(select => {
-                // Clear existing options except the default
                 while (select.options.length > 1) {
                     select.remove(1);
                 }
                 
-                // Add deck options
                 decks.forEach(deck => {
                     const option = document.createElement('option');
                     option.value = deck.id;
@@ -204,37 +229,58 @@ function loadDecks() {
         .catch(error => console.error('Error loading decks:', error));
 }
 
-// Dynamic toggle function for answers
+// 5. UI Display functions
+function displayCard() {
+    const flashcardContentId = `${currentMode}-flashcard-content`; 
+    const flashcardAnswerId = `${currentMode}-flashcard-answer`; 
+    const flashcardContent = document.getElementById(flashcardContentId);
+    const flashcardAnswer = document.getElementById(flashcardAnswerId);
+
+    if (!flashcardContent) {
+        console.error(`No element found for mode: ${currentMode}`);
+        return;
+    }
+
+    if (flashcards.length === 0) {
+        flashcardContent.innerText = 'No flashcards available.';
+        return;
+    }
+
+    const currentCard = flashcards[currentCardIndex];
+    flashcardContent.innerText = currentCard.question;
+
+    if (flashcardAnswer) {
+        if (currentMode === 'truefalse') {
+            const displayedAnswer = currentCard.displayedAnswer || 'True/False';
+            flashcardAnswer.innerText = displayedAnswer;
+        } else if (currentMode === 'learn') {
+            flashcardAnswer.innerText = currentCard.answer;       
+        }
+    }
+}
+
 function toggleAnswer(mode) {
-    // Construct the IDs for question and answer based on the mode
-    const questionId = '${mode}-flashcard-content'; // e.g., "learn-flashcard-content"
-    const answerId = '${mode}-flashcard-answer'; // e.g., "learn-flashcard-answer"
+    const questionId = `${mode}-flashcard-content`;
+    const answerId = `${mode}-flashcard-answer`;
 
     const questionElement = document.getElementById(questionId);
     const answerElement = document.getElementById(answerId);
 
-    // Check if both elements are found
     if (!questionElement || !answerElement) {
-        console.error('Elements not found for mode: ${mode}');
+        console.error(`Elements not found for mode: ${mode}`);
         return;
     }
 
-    // Toggle visibility
     if (answerElement.style.display === 'none' || answerElement.style.display === '') {
-        answerElement.style.display = 'block'; // Show answer
-        questionElement.style.display = 'none'; // Hide question
+        answerElement.style.display = 'block';
+        questionElement.style.display = 'none';
     } else {
-        answerElement.style.display = 'none'; // Hide answer
-        questionElement.style.display = 'block'; // Show question
+        answerElement.style.display = 'none';
+        questionElement.style.display = 'block';
     }
 }
 
-
-// Initialize event delegation when the page loads
-document.addEventListener('DOMContentLoaded', () => {
-    setupModeEventListeners();
-});
-
+// 6. View management functions
 function showTestground() {
     document.getElementById('dashboard-view').classList.add('hidden');
     document.getElementById('testground-view').classList.remove('hidden');
@@ -273,8 +319,99 @@ function showMatching() {
     document.getElementById('matching-view').classList.remove('hidden');
 }
 
+// 7. Mode and content loading functions
+function loadMode(mode) {
+    currentMode = mode;
 
+    fetch(`/mode/${mode}/`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Failed to load ${mode} mode`);
+            }
+            return response.text();
+        })
+        .then(html => {
+            const modeContainer = document.getElementById('mode-container');
+            modeContainer.innerHTML = html;
+            
+            if (modeContainer.querySelector('[data-deck-select]')) {
+                loadDecks();
+            }
+        })
+        .catch(error => {
+            console.error('Error loading the mode:', error);
+        });
+}
 
+// 8. Event listeners and initialization
+function setupModeEventListeners() {
+    const modeContainer = document.getElementById('mode-container');
+    
+    if (!modeContainer) return;
 
+    modeContainer.addEventListener('click', (event) => {
+        const target = event.target;
 
-  
+        if (target.matches('[data-action]')) {
+            const action = target.dataset.action;
+
+            switch (action) {
+                case 'toggle-answer-learn':
+                    toggleAnswer('learn');
+                    break;
+                case 'toggle-answer-test':
+                    toggleAnswer('test');
+                    break;
+                case 'next-card':
+                    currentCardIndex = (currentCardIndex + 1) % flashcards.length;
+                    displayCard();
+                    break;
+                case 'prev-card':
+                    currentCardIndex = (currentCardIndex - 1 + flashcards.length) % flashcards.length;
+                    displayCard();
+                    break;
+                case 'true':
+                    const trueCard = flashcards[currentCardIndex];
+                    if (checkAnswer(trueCard, 'true')) {
+                        alert('Correct!');
+                        currentCardIndex = (currentCardIndex + 1) % flashcards.length;
+                    } else {
+                        alert(`Incorrect! The correct answer was: ${trueCard.correctAnswer}.`);
+                    }
+                    displayCard();
+                    break;
+                
+                case 'false':
+                    const falseCard = flashcards[currentCardIndex];
+                    if (checkAnswer(falseCard, 'false')) {
+                        alert('Correct!');
+                        currentCardIndex = (currentCardIndex + 1) % flashcards.length;
+                    } else {
+                        alert(`Incorrect! The correct answer was: ${falseCard.correctAnswer}.`);
+                    }
+                    displayCard();
+                    break;
+            }
+        }
+    });
+
+    modeContainer.addEventListener('change', (event) => {
+        const target = event.target;
+
+        if (target.matches('[data-deck-select]')) {
+            const mode = target.dataset.deckSelect;
+            const deckId = target.value;
+
+            if (!deckId) {
+                alert('Please select a valid deck.');
+                return;
+            }
+
+            fetchFlashcards(deckId, mode === 'truefalse' || mode === 'matching');
+        }  
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    setupModeEventListeners();
+});

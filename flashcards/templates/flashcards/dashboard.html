@@ -12,68 +12,105 @@
     </style>
 </head>
 <body>
-
-    <!-- Dashboard view -->
     <div id="dashboard-view">
-        <h1>Dashboard</h1>
-        <form action="{% url 'create_deck' %}" method="post">
-            {% csrf_token %}
-            <label for="deck_name">Deck Name:</label>
-            <input type="text" id="deck_name" name="deck_name" required>
-            <label for="deck_description">Deck Description:</label>
-            <textarea id="deck_description" name="deck_description" required></textarea>
-            <button type="submit">Create Deck</button>
-        </form>
-
+        <!-- Create Deck Form -->
         <form action="{% url 'dashboard' %}" method="post">
             {% csrf_token %}
+            <input type="hidden" name="form_type" value="create_deck">
+    
+            <label for="deck_name">New Deck Name:</label>
+            <input type="text" id="deck_name" name="deck_name" required>
+    
+            <label for="deck_description">New Deck Description:</label>
+            <textarea id="deck_description" name="deck_description" required></textarea>
+    
+            <button type="submit">Create Deck</button>
+        </form>
+    
+        <!-- Select Deck Form -->
+        <form action="{% url 'dashboard' %}" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="form_type" value="select_deck">
+    
             <label for="selected_deck">Select Deck:</label>
             <select id="selected_deck" name="selected_deck" required onchange="this.form.submit()">
                 <option value="">Select a deck</option>
                 {% for deck in decks %}
-                    <option value="{{ deck.id }}" {% if selected_deck and deck.id == selected_deck.id %}selected{% endif %}>{{ deck.name }}</option>
+                    <option value="{{ deck.id }}" {% if selected_deck and deck.id == selected_deck.id %}selected{% endif %}>
+                        {{ deck.name }}
+                    </option>
                 {% endfor %}
             </select>
         </form>
-
+    
         {% if selected_deck %}
-            <h2>Edit Deck: {{ selected_deck.name }}</h2>
-            <form action="{% url 'dashboard' %}" method="post">
+            <!-- Edit Deck Form -->
+            <form action="{% url 'dashboard' %}" method="post" id="edit-deck-form">
                 {% csrf_token %}
+                <input type="hidden" name="form_type" value="edit_deck">
                 <input type="hidden" name="selected_deck" value="{{ selected_deck.id }}">
-                <label for="deck_name">Deck Name:</label>
-                <input type="text" id="deck_name" name="deck_name" value="{{ selected_deck.name }}" required>
-                <label for="deck_description">Deck Description:</label>
-                <textarea id="deck_description" name="deck_description" required>{{ selected_deck.description }}</textarea>
-
-                <h2>Edit Flashcards</h2>
-                {% for flashcard in flashcards %}
-                    <div>
-                        <label for="question_{{ flashcard.id }}">Question:</label>
-                        <textarea id="question_{{ flashcard.id }}" name="question_{{ flashcard.id }}" required>{{ flashcard.question }}</textarea>
-                        <label for="answer_{{ flashcard.id }}">Answer:</label>
-                        <textarea id="answer_{{ flashcard.id }}" name="answer_{{ flashcard.id }}" required>{{ flashcard.answer }}</textarea>
-                    </div>
-                {% endfor %}
-
+    
+                <label for="edit_deck_name">Deck Name:</label>
+                <input type="text" id="edit_deck_name" name="deck_name" value="{{ selected_deck.name }}" required>
+    
+                <label for="edit_deck_description">Deck Description:</label>
+                <textarea id="edit_deck_description" name="deck_description" required>{{ selected_deck.description }}</textarea>
+    
                 <button type="submit">Save Changes</button>
             </form>
+    
+            <!-- Delete Deck Button with AJAX -->
+            <div class="deck-card" data-deck-id="{{ selected_deck.id }}">
+                <h3>{{ selected_deck.name }}</h3>
+                <button onclick="deleteDeck(event, this)">Delete Deck</button>
+            </div>
+    
+            <!-- Edith flashcards section -->
+            <h2>Edit Flashcards for {{ selected_deck.name }}</h2>
+            <div id="flashcards-container">
+                {% for flashcard in flashcards %}
+                <div class="flashcard" id="flashcard-{{ flashcard.id }}" data-flashcard-id="{{ flashcard.id }}">
+                    <form id="edit-flashcard-form-{{ flashcard.id }}" onsubmit="saveFlashcard(event, '{{ flashcard.id }}')">
+                            {% csrf_token %}
+                            <input type="hidden" name="form_type" value="edit_flashcard">
+                            <input type="hidden" name="selected_deck" value="{{ selected_deck.id }}">
+                            <input type="hidden" name="flashcard_id" value="{{ flashcard.id }}">
+            
+                            <label for="question_{{ flashcard.id }}">Question:</label>
+                            <textarea id="question_{{ flashcard.id }}" name="question_{{ flashcard.id }}" required>{{ flashcard.question }}</textarea>
+            
+                            <label for="answer_{{ flashcard.id }}">Answer:</label>
+                            <textarea id="answer_{{ flashcard.id }}" name="answer_{{ flashcard.id }}" required>{{ flashcard.answer }}</textarea>
+            
+                            <button type="submit">Save Changes</button>
+                        </form>
+                        <!-- Delete Flashcard Button -->
+                        <button onclick="deleteFlashcard(event, this)">Delete Flashcard</button>
 
+                    </div>
+                {% endfor %}
+            </div>
+            
+    
             <h2>Add Flashcard to {{ selected_deck.name }}</h2>
-            <form action="{% url 'dashboard' %}" method="post">
+            <form id="add-flashcard-form" action="{% url 'dashboard' %}" method="post">
                 {% csrf_token %}
+                <input type="hidden" name="form_type" value="add_flashcard">
                 <input type="hidden" name="selected_deck" value="{{ selected_deck.id }}">
+    
                 <label for="question">Question:</label>
                 <textarea id="question" name="question" required></textarea>
+    
                 <label for="answer">Answer:</label>
                 <textarea id="answer" name="answer" required></textarea>
+    
                 <button type="submit">Add Flashcard</button>
             </form>
         {% endif %}
-
-        <button onclick="showTestground()">Go to Testground</button>
+    <div>
+    <button onclick="showTestground()">Go to Testground</button>
     </div>
-
+</div>
 
     <div id="testground-view" class="hidden">
         <h2>Testground</h2>
