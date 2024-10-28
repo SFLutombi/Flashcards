@@ -12,7 +12,44 @@ let currentCardIndex = 0;
 let showAnswer = false;
 let currentMode = '';
 
-// 3. Core data manipulation functions
+//3. Mode functions
+function generateMultipleChoiceCards(originalFlashcards) {
+    // Ensure the input is valid (non-empty array of flashcards).
+    if (!Array.isArray(originalFlashcards) || originalFlashcards.length === 0) {
+        console.error('Invalid flashcards array provided to generateMultipleChoiceCards');
+        return [];
+    }
+
+    const multipleChoiceCards = [];
+
+    // Loop over each flashcard to create a question with 4 answer choices.
+    originalFlashcards.forEach(card => {
+        const questionObj = {
+            question: card.question,
+            correctAnswer: card.answer,
+            choices: [],
+        };
+
+        // Filter out the correct answer and select 3 random incorrect answers.
+        const wrongAnswers = originalFlashcards
+            .filter(c => c.answer !== card.answer)
+            .map(c => c.answer);
+
+        // If not enough wrong answers exist, adjust the selection to avoid errors.
+        const shuffledWrongAnswers = wrongAnswers.sort(() => 0.5 - Math.random()).slice(0, 3);
+
+        // Combine the correct answer with 3 incorrect ones.
+        const allChoices = [...shuffledWrongAnswers, card.answer];
+
+        // Randomly shuffle the choices to prevent the correct answer from always being last.
+        questionObj.choices = allChoices.sort(() => 0.5 - Math.random());
+
+        multipleChoiceCards.push(questionObj);
+    });
+
+    return multipleChoiceCards;
+}
+
 function generateTrueFalseCards(originalFlashcards) {
     if (!Array.isArray(originalFlashcards) || originalFlashcards.length === 0) {
         console.error('Invalid flashcards array provided to generateTrueFalseCards');
@@ -49,7 +86,7 @@ function generateTrueFalseCards(originalFlashcards) {
 
     return trueFalseCards;
 }
-
+//4. Logic Functions
 function checkAnswer(card, userAnswer) {
     if (!card || typeof card.correctAnswer === 'undefined') {
         console.error('Invalid card object:', card);
@@ -62,7 +99,7 @@ function checkAnswer(card, userAnswer) {
     return (userAnswer === 'true' && isDisplayedCorrect) || 
            (userAnswer === 'false' && !isDisplayedCorrect);
 }
-
+// 5. Core data manipulation functions
 function deleteFlashcard(event, formElement) {
     event.preventDefault();  // Prevent form submission
 
@@ -178,7 +215,7 @@ function hideFlashcardSections() {
     if (addFlashcardForm) addFlashcardForm.style.display = 'none';  // Hide add flashcard form
 }
 
-// 4. API interaction functions
+// 6. API interaction functions
 function fetchFlashcards(deckId, shuffle = false) {
     const url = `/api/flashcards/${deckId}${shuffle ? '?shuffle=true' : ''}`;
 
@@ -194,7 +231,10 @@ function fetchFlashcards(deckId, shuffle = false) {
 
             if (currentMode === 'truefalse') {
                 flashcards = generateTrueFalseCards(originalFlashcards);
-            } else {
+            } else if (currentMode === 'multiplechoice') {
+                flashcards = generateMultipleChoiceCards(originalFlashcards);
+            } 
+            else if (currentMode === 'learn') {
                 flashcards = originalFlashcards;
             }
 
@@ -229,7 +269,7 @@ function loadDecks() {
         .catch(error => console.error('Error loading decks:', error));
 }
 
-// 5. UI Display functions
+// 7. UI Display functions
 function displayCard() {
     const flashcardContentId = `${currentMode}-flashcard-content`; 
     const flashcardAnswerId = `${currentMode}-flashcard-answer`; 
@@ -255,9 +295,32 @@ function displayCard() {
             flashcardAnswer.innerText = displayedAnswer;
         } else if (currentMode === 'learn') {
             flashcardAnswer.innerText = currentCard.answer;       
+        } else if (currentMode === 'multiplechoice') {
+            flashcardAnswer.innerHTML = '';  // Clear previous answers.
+
+            // Loop through all choices and create buttons for each.
+            currentCard.choices.forEach(choice => {
+                const button = document.createElement('button');
+                button.textContent = choice;
+
+                // Set an event listener to check if the answer is correct.
+                button.onclick = () => {
+                    if (choice === currentCard.correctAnswer) {
+                        alert('Correct!');
+                        currentCardIndex = (currentCardIndex + 1) % flashcards.length;
+                        displayCard();
+                    } else {
+                        alert('Incorrect. Try again!');
+                    }
+                };
+
+                // Append the button to the answer container.
+                flashcardAnswer.appendChild(button);
+            });
         }
     }
 }
+
 
 function toggleAnswer(mode) {
     const questionId = `${mode}-flashcard-content`;
@@ -280,7 +343,7 @@ function toggleAnswer(mode) {
     }
 }
 
-// 6. View management functions
+// 8. View management functions
 function showTestground() {
     document.getElementById('dashboard-view').classList.add('hidden');
     document.getElementById('testground-view').classList.remove('hidden');
@@ -319,7 +382,7 @@ function showMatching() {
     document.getElementById('matching-view').classList.remove('hidden');
 }
 
-// 7. Mode and content loading functions
+// 9. Mode and content loading functions
 function loadMode(mode) {
     currentMode = mode;
 
@@ -343,7 +406,7 @@ function loadMode(mode) {
         });
 }
 
-// 8. Event listeners and initialization
+// 10. Event listeners and initialization
 function setupModeEventListeners() {
     const modeContainer = document.getElementById('mode-container');
     
