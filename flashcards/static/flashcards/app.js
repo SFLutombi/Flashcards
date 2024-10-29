@@ -8,11 +8,104 @@ class Flashcard {
 
 // 2. Global state variables
 let flashcards = [];
+let originalFlashcards = [];
 let currentCardIndex = 0;
 let showAnswer = false;
 let currentMode = '';
 
 //3. Mode functions
+function generateMatchingButtons(originalFlashcards) {
+    console.log('this is the original flashcards:', originalFlashcards);
+
+    if (!Array.isArray(originalFlashcards) || originalFlashcards.length === 0) {
+        console.error('Invalid flashcards array provided to generateMatchingButtons');
+        return;
+    }
+
+    const flashcardContent = document.getElementById('matching-flashcard-content');
+    flashcardContent.innerHTML = ''; // Clear previous buttons
+
+    const questions = originalFlashcards.map(card => card.question);
+    const answers = originalFlashcards.map(card => card.answer);
+    
+    const shuffledQuestions = questions.sort(() => 0.5 - Math.random());
+    const shuffledAnswers = answers.sort(() => 0.5 - Math.random());
+
+    // Create question buttons
+    shuffledQuestions.forEach(question => {
+        const button = document.createElement('button');
+        button.textContent = question;
+        button.dataset.type = 'question';
+        button.onclick = (event) => handleSelection(event, originalFlashcards); // Pass originalFlashcards
+        flashcardContent.appendChild(button);
+    });
+
+    // Create answer buttons
+    shuffledAnswers.forEach(answer => {
+        const button = document.createElement('button');
+        button.textContent = answer;
+        button.dataset.type = 'answer';
+        button.onclick = (event) => handleSelection(event, originalFlashcards); // Pass originalFlashcards
+        flashcardContent.appendChild(button);
+    });
+}
+
+
+let selectedQuestion = null;
+let selectedAnswer = null;
+
+function handleSelection(event) {
+    const button = event.target;
+    const feedback = document.getElementById('matching-feedback');
+    
+    if (button.dataset.type === 'question') {
+        // Handle question selection
+        if (selectedQuestion) {
+            selectedQuestion.classList.remove('selected');
+        }
+        selectedQuestion = button;
+        selectedQuestion.classList.add('selected');
+    } else if (button.dataset.type === 'answer') {
+        // Handle answer selection
+        if (selectedAnswer) {
+            selectedAnswer.classList.remove('selected');
+        }
+        selectedAnswer = button;
+        selectedAnswer.classList.add('selected');
+    }
+
+    // If both a question and an answer are selected
+    if (selectedQuestion && selectedAnswer) {
+        checkMatch(selectedQuestion, selectedAnswer, originalFlashcards); // Pass originalFlashcards here
+    }
+}
+
+
+function checkMatch(questionButton, answerButton, originalFlashcards) {
+    const questionText = questionButton.textContent;
+    const answerText = answerButton.textContent;
+
+    // Find the correct answer for the selected question
+    const isCorrect = originalFlashcards.some(card => card.question === questionText && card.answer === answerText);
+    const feedback = document.getElementById('matching-feedback');
+
+    if (isCorrect) {
+        feedback.textContent = 'Correct match!';
+        questionButton.style.display = 'none';
+        answerButton.style.display = 'none';
+    } else if(!isCorrect) {
+        feedback.textContent = 'Wrong match! Try again.';
+    } 
+
+    // Reset selections
+    selectedQuestion = null;
+    selectedAnswer = null;
+ 
+}
+
+// Assume you have a function that loads the selected deck and fetches flashcards
+// Call generateMatchingButtons with the fetched flashcards when the deck is selected
+
 function generateMultipleChoiceCards(originalFlashcards) {
     // Ensure the input is valid (non-empty array of flashcards).
     if (!Array.isArray(originalFlashcards) || originalFlashcards.length === 0) {
@@ -86,6 +179,7 @@ function generateTrueFalseCards(originalFlashcards) {
 
     return trueFalseCards;
 }
+
 //4. Logic Functions
 function checkAnswer(card, userAnswer) {
     if (!card || typeof card.correctAnswer === 'undefined') {
@@ -227,8 +321,8 @@ function fetchFlashcards(deckId, shuffle = false) {
             return response.json();
         })
         .then(data => {
-            const originalFlashcards = data.map(item => new Flashcard(item.question, item.answer));
-
+            originalFlashcards = data.map(item => new Flashcard(item.question, item.answer));
+            console.log('this is the flashcards1:', originalFlashcards);
             if (currentMode === 'truefalse') {
                 flashcards = generateTrueFalseCards(originalFlashcards);
             } else if (currentMode === 'multiplechoice') {
@@ -236,6 +330,11 @@ function fetchFlashcards(deckId, shuffle = false) {
             } 
             else if (currentMode === 'learn') {
                 flashcards = originalFlashcards;
+            }
+            else if (currentMode === 'matching') {
+                flashcards = generateMatchingButtons(originalFlashcards);
+
+               
             }
 
             currentCardIndex = 0;
@@ -245,7 +344,9 @@ function fetchFlashcards(deckId, shuffle = false) {
             console.error('Error fetching flashcards:', error);
             alert('Failed to load flashcards. Please try again.');
         });
+        
 }
+
 
 function loadDecks() {
     fetch('/api/decks/')
@@ -270,7 +371,12 @@ function loadDecks() {
 }
 
 // 7. UI Display functions
+
 function displayCard() {
+    if (currentMode === 'matching') {
+        console.log('Skipping displayCard for matching mode.');
+        return;
+    }
     const flashcardContentId = `${currentMode}-flashcard-content`; 
     const flashcardAnswerId = `${currentMode}-flashcard-answer`; 
     const flashcardContent = document.getElementById(flashcardContentId);
@@ -287,16 +393,19 @@ function displayCard() {
     }
 
     const currentCard = flashcards[currentCardIndex];
-    flashcardContent.innerText = currentCard.question;
+    
 
     if (flashcardAnswer) {
         if (currentMode === 'truefalse') {
             const displayedAnswer = currentCard.displayedAnswer || 'True/False';
             flashcardAnswer.innerText = displayedAnswer;
+            flashcardContent.innerText = currentCard.question;
         } else if (currentMode === 'learn') {
-            flashcardAnswer.innerText = currentCard.answer;       
+            flashcardAnswer.innerText = currentCard.answer;
+            flashcardContent.innerText = currentCard.question;       
         } else if (currentMode === 'multiplechoice') {
             flashcardAnswer.innerHTML = '';  // Clear previous answers.
+            flashcardContent.innerText = currentCard.question;
 
             // Loop through all choices and create buttons for each.
             currentCard.choices.forEach(choice => {
@@ -317,7 +426,7 @@ function displayCard() {
                 // Append the button to the answer container.
                 flashcardAnswer.appendChild(button);
             });
-        }
+        }   
     }
 }
 
@@ -478,3 +587,4 @@ function setupModeEventListeners() {
 document.addEventListener('DOMContentLoaded', () => {
     setupModeEventListeners();
 });
+

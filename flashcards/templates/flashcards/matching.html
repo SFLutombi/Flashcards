@@ -1,6 +1,9 @@
-
-
-<div id="matching-view" class="hidden">
-    <h2>Matching Mode</h2>
-    <!-- Add your matching mode content here -->
+{% load static %}
+<link rel="stylesheet" type="text/css" href="{% static 'flashcards/styles.css' %}">
+<div class="mode-content matching-mode">
+    <select id="deck-select-matching" data-deck-select="matching">
+        <option value="">Select a deck to match</option>
+    </select>
+    <div id="matching-flashcard-content"></div>
+    <div id="matching-feedback"></div>
 </div>
